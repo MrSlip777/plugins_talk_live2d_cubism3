@@ -5,11 +5,13 @@
 // This software is released under the MIT License.
 //-----------------------------------------------------------------------------
 //
+
+// Game_Live2d
 //
-// Slip 2018/06/25
+// Slip 2016/12/25
 //-----------------------------------------------------------------------------
 /*:
-* @plugindesc ツクールMV上でlive2Dモデルを立ち絵として使うプラグインです。
+* @plugindesc ゲームに使用するLive2Dの制御フラグ、設定ファイルなど
 * @author Slip
 *
 * @param folder1
@@ -259,7 +261,7 @@ var live2dloadmodel = function (loader, resources){
 
 Scene_Map.prototype.createlive2d = function(){
     
-    if($gameLive2d._model[0] == null){
+    if(live2dmodel == null){
         //Cubism3.0
         $gameLive2d._model[0] = PIXI.loader
         //$gameLive2d._model[0] = new PIXI.loaders.Loader()
@@ -276,6 +278,10 @@ Scene_Map.prototype.createlive2d = function(){
         //PIXI.loader
         $gameLive2d._model[0].load(live2dloadmodel);
         
+    }
+    else{
+        SceneManager._scene._spriteset.addChild(live2dmodel);
+        SceneManager._scene._spriteset.addChild(live2dmodel.masks);
     }
 
 };
