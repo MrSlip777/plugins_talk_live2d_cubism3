@@ -14,27 +14,50 @@
 * @plugindesc ゲームに使用するLive2Dの制御フラグ、設定ファイルなど
 * @author Slip
 *
-* @param folder1
+* @param folder_1
 * @type string
 * @desc live2Dモデルのフォルダパス
 * @default assets/Koharu/
 *
-* @param moc3
+* @param moc3_1
 * @type string
 * @desc moc3のファイルパス
 * @default Koharu.moc3
-* @parent folder1
+* @parent folder_1
 *
-* @param texture
+* @param texture_1
 * @type string
 * @desc textureのファイルパス
 * @default Koharu.png
-* @parent moc3
+* @parent moc3_1
 *
-* @param motion3
+* @param motion3_1
 * @type string[]
 * @default ["Koharu.motion3.json"]
-* @parent moc3
+* @parent moc3_1
+* @desc motion3のファイルパス
+*
+* @param folder_2
+* @type string
+* @desc live2Dモデルのフォルダパス
+* @default assets/Mark_model3/
+*
+* @param moc3_2
+* @type string
+* @desc moc3のファイルパス
+* @default Mark.moc3
+* @parent folder_2
+*
+* @param texture_2
+* @type string
+* @desc textureのファイルパス
+* @default Mark.2048/texture_00.png
+* @parent moc3_2
+*
+* @param motion3_2
+* @type string[]
+* @default ["mark_m01.motion3.json","mark_m02.motion3.json","mark_m03.motion3.json","mark_m04.motion3.json","mark_m05.motion3.json"]
+* @parent moc3_2
 * @desc motion3のファイルパス
 *
 */
@@ -48,26 +71,41 @@ Game_Live2d.prototype.initialize = function() {
 
     var parameters = PluginManager.parameters('Live2DInterfaceMV');
 
-    //cubism3.0
-    this._resources = null;
-    this._loader = null;
+    //モデルの内部データ
+    this._resources = {};
+    this._loader = {};
 
-    //cubism2.1
     //モデルの数
     this.MAXNUMBER = 16;
 
-    //設定ファイル
-    this._folder = String(parameters['folder1']);
-    this._moc = String(parameters['moc3']);
-    this._texture = String(parameters['texture']);
+    //読み込み中のモデル（読み込み時にしか使わない）
+    this._loadNum = 1;
+    this._initMotion = {};
 
-    var str = parameters['motion3'].replace('[','');
+    //設定ファイル
+    this._folder = {};
+    this._moc = {};
+    this._texture = {};
+    this._folder[0] = String(parameters['folder_1']);
+    this._moc[0] = String(parameters['moc3_1']);
+    this._texture[0] = String(parameters['texture_1']);
+    
+    this._motion = {};
+    var str = parameters['motion3_1'].replace('[','');
     str = str.replace(']','');
     str = str.replace(/"/g,'');
-    this._motion = str.split(',');
+    this._motion[0] = str.split(',');
+    this._initMotion[0] = this._motion[0][0].replace(".motion3.json","");
 
-    //生成したモデル
-    this._model = {};
+    this._folder[1] = String(parameters['folder_2']);
+    this._moc[1] = String(parameters['moc3_2']);
+    this._texture[1] = String(parameters['texture_2']);
+
+    str = parameters['motion3_2'].replace('[','');
+    str = str.replace(']','');
+    str = str.replace(/"/g,'');
+    this._motion[1] = str.split(',');
+    this._initMotion[1] = this._motion[1][0].replace(".motion3.json","");
 
     this._visible = {};
     this._x = {};
@@ -83,7 +121,6 @@ Game_Live2d.prototype.initialize = function() {
     this._duration = {};    
 
     for(var i = 0; i < this.MAXNUMBER; i++){
-        this._model[i] = null;
         this._visible[i] = false;
         this._x[i] = 0;
         this._y[i] = 0;
@@ -171,40 +208,41 @@ function Live2DManager() {
 }
 
 Live2DManager.prototype.initialize = function() {
-    live2dmodel = null;
+    live2dmodel[0] = null;
+    live2dmodel[1] = null;
 }
 
 //表示フラグ
-Live2DManager.prototype.live2dVisible = function (flag) {
-    live2dmodel.visible = flag;
+Live2DManager.prototype.live2dVisible = function (model_no,flag) {
+    live2dmodel[model_no].visible = flag;
 };
 
 //表情設定（.motion3.jsonの手前の文字列）
-Live2DManager.prototype.live2dEmotion = function (stEmotion){
+Live2DManager.prototype.live2dEmotion = function (model_no,stEmotion){
     var animation 
-    = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json($gameLive2d._resources[stEmotion].data);
-    live2dmodel.animator
+    = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json($gameLive2d._resources[model_no][stEmotion].data);
+    live2dmodel[model_no].animator
         .getLayer("base")
         .play(animation);    
 }
 
-var live2dmodel = null;
+var live2dmodel = {};
 
-var live2dloadmodel = function (loader, resources){
-    //var app = new PIXI.Application(816, 640, { backgroundColor: 0x1099bb });
-    var app = new PIXI.Application(816, 640);
+var live2dloadmodels = {};
+var app = new PIXI.Application(816, 640);
 
+function live2dloadmodel(loader, resources,model_no){
     //表情初期値
-    var calledName = $gameLive2d._motion[0].replace(".motion3.json","");
+    var calledName = $gameLive2d._motion[model_no][0].replace(".motion3.json","");
 
     //jsonデータ等を保持する
-    $gameLive2d._resources = resources;
-    $gameLive2d._loader = loader;
+    $gameLive2d._resources[model_no] = resources;
+    $gameLive2d._loader[model_no] = loader;
 
     //Slip 2018/06/18
     var pm = new PlatformManager();
     
-    pm.loadBytes($gameLive2d._folder+$gameLive2d._moc, function(afterbuffer) {
+    pm.loadBytes($gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], function(afterbuffer) {
             
         resources['moc'].data = afterbuffer;
 
@@ -212,8 +250,8 @@ var live2dloadmodel = function (loader, resources){
 
         if(moc){
             //LIVE2DCUBISMPIXIがツクールMVのエディタ上で読めない
-            if(live2dmodel == null){
-                live2dmodel = new LIVE2DCUBISMPIXI.ModelBuilder()
+            if(live2dmodel[model_no] == null){
+                live2dmodel[model_no] = new LIVE2DCUBISMPIXI.ModelBuilder()
                     .setMoc(moc)
                     .setTimeScale(1)
                     .addTexture(0, resources['texture'].texture)
@@ -221,69 +259,64 @@ var live2dloadmodel = function (loader, resources){
                     .build();
             }
 
-            SceneManager._scene._spriteset.addChild(live2dmodel);
-            SceneManager._scene._spriteset.addChild(live2dmodel.masks);
+            SceneManager._scene._spriteset.addChild(live2dmodel[model_no]);
+            SceneManager._scene._spriteset.addChild(live2dmodel[model_no].masks);
                 
-            var animation = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json(resources[calledName].data);
-            live2dmodel.animator
+            var animation
+             = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json(resources[calledName].data);
+            live2dmodel[model_no].animator
                 .getLayer("base")
                 .play(animation);
-
+            
             app.ticker.add(function (deltaTime) {
-                live2dmodel.update(deltaTime);
-                live2dmodel.masks.update(app.renderer);
+                live2dmodel[model_no].update(deltaTime);
+                live2dmodel[model_no].masks.update(app.renderer);
             });
+            var width = 1200;
+            var height = 750;
+            live2dmodel[model_no].visible = false;
+            live2dmodel[model_no].position = new PIXI.Point((width * 0.5), (height * 0.5));
+            live2dmodel[model_no].scale
+             = new PIXI.Point((live2dmodel[model_no].position.x * 0.8), (live2dmodel[model_no].position.x * 0.8));
+            live2dmodel[model_no].masks.resize(app.view.width, app.view.height);
 
-            var onResize = function (event) {
-                if (event === void 0) { event = null; }
-                //var width = window.innerWidth;
-                //var height = (width / 16.0) * 9.0;
-                //位置、大きさはブラウザの大きさ問わず固定する Slip 2018/02/26
-                var width = 1200;
-                var height = 750;
-                app.view.style.width = width + "px";
-                app.view.style.height = height + "px";
-                app.renderer.resize(width, height);
-                live2dmodel.position = new PIXI.Point((width * 0.5), (height * 0.5));
-                live2dmodel.scale = new PIXI.Point((live2dmodel.position.x * 0.8), (live2dmodel.position.x * 0.8));
-                live2dmodel.masks.resize(app.view.width, app.view.height);
-            
-            };
-            live2dmodel.visible = false;
-            
-            onResize();
-            window.onresize = onResize;
-           
         }
     });
-     
+    
+};
+
+function loadAssets(model_no){
+    var modelLoader = null;
+
+    modelLoader = new PIXI.loaders.Loader()
+        .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+        .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+    
+    $gameLive2d._motion[model_no].forEach(function(value){
+        var calledName = value.replace(".motion3.json","");
+        modelLoader
+        .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+    });
+
+    modelLoader.load(
+        function (loader, resources){
+            live2dloadmodel(loader, resources,$gameLive2d._loadNum);
+            $gameLive2d._loadNum--;
+        }
+    );
 };
 
 Scene_Map.prototype.createlive2d = function(){
     
-    if(live2dmodel == null){
-        //Cubism3.0
-        $gameLive2d._model[0] = PIXI.loader
-        //$gameLive2d._model[0] = new PIXI.loaders.Loader()
-            .add('moc', $gameLive2d._folder+$gameLive2d._moc, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
-            .add('texture',  $gameLive2d._folder+$gameLive2d._texture);
-        
-        $gameLive2d._motion.forEach(function(value){
-            var calledName = value.replace(".motion3.json","");
-            //PIXI.loader
-            $gameLive2d._model[0]
-            .add(calledName, $gameLive2d._folder+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
-        });
-        
-        //PIXI.loader
-        $gameLive2d._model[0].load(live2dloadmodel);
-        
+    for(var i=0; i<2; i++){
+        if(live2dmodel[i] == null){
+            loadAssets(i);
+        }
+        else{
+            SceneManager._scene._spriteset.addChild(live2dmodel[i]);
+            SceneManager._scene._spriteset.addChild(live2dmodel[i].masks);
+        }
     }
-    else{
-        SceneManager._scene._spriteset.addChild(live2dmodel);
-        SceneManager._scene._spriteset.addChild(live2dmodel.masks);
-    }
-
 };
 
 
