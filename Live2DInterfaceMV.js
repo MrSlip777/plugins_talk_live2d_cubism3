@@ -565,7 +565,7 @@ Game_Live2d.prototype.initialize = function() {
     this._loader = {};
 
     //モデルの数
-    this.MAXNUMBER = 1;
+    this.MAXNUMBER = 16;
 
     //読み込み中のモデル（読み込み時にしか使わない）
     this._loadNum = 1;
@@ -636,6 +636,7 @@ var $gameLive2d = null;
                 gameLive2d_no++;
             }
 
+            var model_no = 0;
             //モデル名を検索
             var path = $gameLive2d._folder[gameLive2d_no]+$gameLive2d._moc[gameLive2d_no];
             for(var number in live2dmodel){
@@ -731,67 +732,70 @@ Live2DManager.prototype.live2dSetScale = function (model_no,scale) {
     }
 };
 
-var live2dloadmodels = {};
-var app = new PIXI.Application(816, 640);
+function ModelBuilder(model_no,moc,texture){
+    if(live2dmodel[model_no] == null){
+        live2dmodel[model_no] = new LIVE2DCUBISMPIXI.ModelBuilder()
+            .setMoc(moc)
+            .setTimeScale(1)
+            .addTexture(0, texture)
+            .addAnimatorLayer("base", LIVE2DCUBISMFRAMEWORK.BuiltinAnimationBlenders.OVERRIDE, 1)
+            .build();
 
-function live2dloadmodel(loader, resources){
-
-    model_no = $gameLive2d._loadNum;
-    //jsonデータ等を保持する
-    $gameLive2d._resources[model_no] = resources;
-    $gameLive2d._loader[model_no] = loader;
-
-    //Slip 2018/06/18
-    var pm = new PlatformManager();
-    
-    pm.loadBytes(resources.moc.url, function(afterbuffer) {
-            
-        resources['moc'].data = afterbuffer;
-
-        var moc = LIVE2DCUBISMCORE.Moc.fromArrayBuffer(resources['moc'].data);
-
-        if(moc){
-            //LIVE2DCUBISMPIXIがツクールMVのエディタ上で読めない
-            if(live2dmodel[model_no] == null){
-                live2dmodel[model_no] = new LIVE2DCUBISMPIXI.ModelBuilder()
-                    .setMoc(moc)
-                    .setTimeScale(1)
-                    .addTexture(0, resources['texture'].texture)
-                    .addAnimatorLayer("base", LIVE2DCUBISMFRAMEWORK.BuiltinAnimationBlenders.OVERRIDE, 1)
-                    .build();
-            }
-            live2dmodel[model_no]._userData = resources.moc.url;
-            SceneManager._scene._spriteset.addChild(live2dmodel[model_no]);
-            SceneManager._scene._spriteset.addChild(live2dmodel[model_no].masks);
-                
-            var animation
-             = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json(resources['defaultMotion'].data);
-            live2dmodel[model_no].animator
-                .getLayer("base")
-                .play(animation);
-            
-            app.ticker.add(function (deltaTime) {
-                live2dmodel[model_no].update(deltaTime);
-                live2dmodel[model_no].masks.update(app.renderer);
-            });
-            
-            var width = 816;
-            var height = 640;
-            live2dmodel[model_no].visible = false;
-            live2dmodel[model_no].position
-             = new PIXI.Point($gameLive2d._pos_middle,$gameLive2d._pos_vertical);
-            live2dmodel[model_no].scale 
-             = new PIXI.Point(($gameLive2d._pos_middle*$gameLive2d._scale_H), 
-             ($gameLive2d._pos_middle*$gameLive2d._scale_V));
-            live2dmodel[model_no].masks.resize(app.view.width, app.view.height);
-
-        }
-    });
-    $gameLive2d._loadNum++;
+    }
 };
 
-function loadAssets(model_no){
-    
+var app = new PIXI.Application(816, 640);
+
+function StartAnimation(model_no,data){
+    var animation
+    = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json(data);
+    live2dmodel[model_no].animator
+        .getLayer("base")
+        .play(animation);
+};
+
+function SceneCombineModel(model_no){
+    SceneManager._scene._spriteset.addChild(live2dmodel[model_no]);
+    SceneManager._scene._spriteset.addChild(live2dmodel[model_no].masks);
+
+    app.ticker.add(function (deltaTime) {
+        live2dmodel[model_no].update(deltaTime);
+        live2dmodel[model_no].masks.update(app.renderer);
+    });
+};
+
+function ModelDataInitialize(model_no){
+    var width = 816;
+    var height = 640;
+    live2dmodel[model_no].visible = false;
+    live2dmodel[model_no].position
+    = new PIXI.Point($gameLive2d._pos_middle,$gameLive2d._pos_vertical);
+    live2dmodel[model_no].scale 
+    = new PIXI.Point(($gameLive2d._pos_middle*$gameLive2d._scale_H), 
+    ($gameLive2d._pos_middle*$gameLive2d._scale_V));
+    live2dmodel[model_no].masks.resize(app.view.width, app.view.height);
+};
+
+function loadlive2dFromResorces(model_no,resources,afterbuffer){
+    resources['moc'].data = afterbuffer;
+        
+    var moc = LIVE2DCUBISMCORE.Moc.fromArrayBuffer(resources['moc'].data);
+
+    if(moc){
+        //LIVE2DCUBISMPIXIがツクールMVのエディタ上で読めない
+        ModelBuilder(model_no,moc,resources['texture'].texture);
+        StartAnimation(model_no,resources['defaultMotion'].data);
+
+        live2dmodel[model_no]._userData = resources.moc.url;
+        SceneCombineModel(model_no);
+        ModelDataInitialize(model_no);
+    }
+};
+
+function loadAssets(){
+     
+    var model_no = 1;
+
     if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
     && $gameLive2d._texture[model_no] != ""){
         var modelLoader = null;
@@ -808,18 +812,492 @@ function loadAssets(model_no){
             .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
         });
 
-        modelLoader.load(live2dloadmodel);
+        modelLoader.load(function(loader, resources){
+            var model_no = 1;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+   
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {           
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
         
     }
+
+    var model_no = 2;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 2;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 3;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 3;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    var model_no = 4;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 4;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 5;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 5;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 6;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 6;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 7;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 7;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 8;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 8;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 9;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 9;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 10;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 10;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 11;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 11;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 12;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 12;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 13;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 13;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+
+    var model_no = 14;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 14;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 15;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 15;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }
+    
+    var model_no = 16;
+
+    if($gameLive2d._folder[model_no] !="" && $gameLive2d._moc[model_no] != ""
+    && $gameLive2d._texture[model_no] != ""){
+        var modelLoader = null;
+        modelLoader = new PIXI.loaders.Loader()
+            .add('moc', $gameLive2d._folder[model_no]+$gameLive2d._moc[model_no], { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.BUFFER }) 
+            .add('texture',  $gameLive2d._folder[model_no]+$gameLive2d._texture[model_no]);
+
+        modelLoader.add('defaultMotion', $gameLive2d._folder[model_no]+$gameLive2d._motion[model_no][0], 
+            { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON });
+        
+        $gameLive2d._motion[model_no].forEach(function(value){
+            var calledName = value.replace(".motion3.json","");
+            modelLoader
+            .add(calledName, $gameLive2d._folder[model_no]+value, { xhrType: PIXI.loaders.Resource.XHR_RESPONSE_TYPE.JSON })
+        });
+
+        modelLoader.load(function(loader, resources){
+            var model_no = 16;
+            //jsonデータ等を保持する
+            $gameLive2d._resources[model_no] = resources;
+
+            PlatformManager.prototype.loadBytes(resources.moc.url, function(afterbuffer) {
+                loadlive2dFromResorces(model_no,resources,afterbuffer);
+
+            });
+        });
+        
+    }    
 };
 
 Scene_Map.prototype.createlive2d = function(){
-    
+
+    if(live2dmodel[1] == null){
+        loadAssets();
+    }    
+
     for(var i=1; i<=$gameLive2d.MAXNUMBER; i++){
-        if(live2dmodel[i] == null){
-            loadAssets(i);
-        }
-        else{
+        if(live2dmodel[i] != null){
             SceneManager._scene._spriteset.addChild(live2dmodel[i]);
             SceneManager._scene._spriteset.addChild(live2dmodel[i].masks);
         }
