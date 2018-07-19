@@ -94,7 +94,7 @@
 * @param name_2
 * @type string
 * @desc モデルの名前
-* @default フォルダ2以降は使えません
+* @default
 * @parent folder_2
 *
 * @param moc3_2
