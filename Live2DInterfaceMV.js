@@ -623,6 +623,16 @@ var $gameLive2d = null;
         Scene_Map_createWindowLayer.call(this);
     };
 
+    //live2dcubismpixi.js
+    const local_MaskSpriteContainer = LIVE2DCUBISMPIXI.MaskSpriteContainer;
+    local_MaskSpriteContainer.prototype.update = function (appRenderer) {
+        for (var m = 0; m < this._maskSprites.length; ++m) {
+            if(appRenderer){//nullチェック追加 Slip
+                appRenderer.render(this._maskMeshContainers[m], this._maskTextures[m], true, null, false);
+            }
+        }
+    };    
+
     // プラグインコマンド
     const Game_Interpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
     Game_Interpreter.prototype.pluginCommand = function(command, args) {
@@ -657,7 +667,20 @@ var $gameLive2d = null;
                 break;
             case 'motion':
             case 'モーション':
-                Live2DManager.prototype.live2dMotion(model_no,args[2]);
+                var loop = true;
+                if(args.lenght <= 3){
+                    loop = true;
+                }
+                else{
+                    if(args[3] == "ループする" ||args[3] == "loop"){
+                        loop = true;
+                    }
+                    else if(args[3] == "ループしない" ||args[3] == "noloop"){
+                        loop = false;
+                    }
+                }
+
+                Live2DManager.prototype.live2dMotion(model_no,args[2],loop);
                 break;
             case 'left':
             case '左':
@@ -707,10 +730,11 @@ Live2DManager.prototype.live2dVisible = function (model_no,flag) {
 };
 
 //表情設定（.motion3.jsonの手前の文字列）
-Live2DManager.prototype.live2dMotion = function (model_no,stMotion){
+Live2DManager.prototype.live2dMotion = function (model_no,stMotion,loop){
     if(live2dmodel[model_no] != null){
         var animation 
         = LIVE2DCUBISMFRAMEWORK.Animation.fromMotion3Json($gameLive2d._resources[model_no][stMotion].data);
+        animation.loop = loop;
         live2dmodel[model_no].animator
             .getLayer("base")
             .play(animation);
