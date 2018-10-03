@@ -803,7 +803,7 @@ function ModelDataInitialize(model_no){
 function loadlive2dFromResorces(model_no,resources,afterbuffer){
     resources['moc'].data = afterbuffer;
         
-    var moc = LIVE2DCUBISMCORE.Moc.fromArrayBuffer(resources['moc'].data);
+    var moc = Live2DCubismCore.Moc.fromArrayBuffer(resources['moc'].data);
 
     if(moc){
         //LIVE2DCUBISMPIXIがツクールMVのエディタ上で読めない
