@@ -605,7 +605,9 @@ var $gameLive2d = null;
     const  DataManager_createGameObjects = DataManager.createGameObjects;
     DataManager.createGameObjects =function(){
         DataManager_createGameObjects.call(this);
-        $gameLive2d = new Game_Live2d();
+        if($gameLive2d == null){
+            $gameLive2d = new Game_Live2d();
+        }
     };
     const Scene_Map_updateWaitCount =Scene_Map.prototype.updateWaitCount;
     Scene_Map.prototype.updateWaitCount =function(){
